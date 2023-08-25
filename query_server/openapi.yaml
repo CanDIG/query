@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: Query
+  version: 1.2.0
+  license:
+    name: Apache 2.0
+    url: 'https://github.com/CanDIG/query/blob/main/LICENSE'
+servers:
+  - url: /
+security:
+  - {}
+  - BasicAuth: []
+  - BearerAuth: []
+paths:
+  /service-info:
+    get:
+      summary: Retrieve information about this service
+      description: Returns information about the query service
+      operationId: query_operations.get_service_info
+      responses:
+        200:
+          description: Retrieve info about the Query service
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      description: |
+        A valid authorization token must be passed in the 'Authorization' header,
+        e.g. "Basic ${token_string}"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description:
+        A valid authorization token must be passed in the 'Authorization' header,
+        e.g. "Bearer ${token_string}"
