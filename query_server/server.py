@@ -1,11 +1,13 @@
-from flask import Flask
+from flask import Flask, session
 from flask_cors import CORS
 import connexion
+import secrets
 import logging
 from config import PORT, DEBUG_MODE
 
 # Create the application instance
 app = connexion.App(__name__, specification_dir='./')
+app.app.config['SECRET_KEY'] = secrets.token_bytes(32)
 CORS(app.app)
 
 app.add_api('openapi.yaml', pythonic_params=True, strict_validation=True)
@@ -17,7 +19,30 @@ app.add_api('openapi.yaml', pythonic_params=True, strict_validation=True)
 
 @app.route('/')
 def index():
-    return 'INDEX'
+    return {
+        "id": "org.candig.query",
+        "name": "CanDIG query service",
+        "type": {
+            "group": "org.candig",
+            "artifact": "query",
+            "version": "v0.1.0"
+        },
+        "description": "A query microservice for operating with HTSGet & Katsu",
+        "organization": {
+            "name": "CanDIG",
+            "url": "https://www.distributedgenomics.ca"
+        },
+        "version": "0.1.0"
+    }
+
+@app.route('/test')
+def test():
+    if "request" not in session:
+        session["request"] = 1
+    else:
+        session["request"] = session["request"] + 1
+    session.modified = True
+    return str(session["request"]), 200
 
 if __name__ == '__main__':
     logging.basicConfig(filename='record.log', level=logging.DEBUG, format=f'%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')

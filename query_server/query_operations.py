@@ -1,13 +1,14 @@
 import connexion
-from flask import request, Flask
+from flask import request, Flask, session
 import os
 import os.path
 import re
 from markupsafe import escape
-
+import secrets
+import config
 
 app = Flask(__name__)
-
+app.config['SECRET_KEY'] = secrets.token_bytes(32)
 
 # API endpoints
 def get_service_info():
@@ -26,6 +27,12 @@ def get_service_info():
         },
         "version": "1.0.0"
     }
+
+@app.route('/query')
+def query(treatment="", primarySite="", chemotherapy="", immunotherapy="", hormoneTherapy="", chrom="", gene=""):
+    if not "request" in session:
+        session["request"] = 1
+    return config.KATSU_URL + " " + session["request"], 200
 
 
 # @app.route('/ga4gh/drs/v1/objects/<path:object_id>')
