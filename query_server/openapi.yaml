@@ -2,9 +2,6 @@ openapi: 3.0.3
 info:
     title: Query
     version: 1.2.0
-    license:
-        name: Apache 2.0
-        url: "https://github.com/CanDIG/query/blob/main/LICENSE"
 servers:
     - url: /
 security:
@@ -45,7 +42,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                type: object
+                                $ref: '#/components/schemas/QueryBody'
                 400:
                     $ref: "#/components/responses/400BadRequestError"
                 404:
@@ -64,7 +61,7 @@ components:
                 $ref: '#/components/schemas/Fields'
         primarySiteParam:
             in: query
-            name: primarySite
+            name: primary_site
             description: A comma-separated list of affected primary sites to look for
             example: Adrenal gland,Bladder
             required: false
@@ -88,7 +85,7 @@ components:
                 $ref: '#/components/schemas/Fields'
         hormoneTherapyParam:
             in: query
-            name: hormoneTherapy
+            name: hormone_therapy
             description: A comma-separated list of hormone therapy treatments to look for
             example: Goserelin,Leuprolide
             required: false
@@ -112,6 +109,30 @@ components:
             required: false
             schema:
                 $ref: '#/components/schemas/Fields'
+#        pageSizeParam:
+#            in: query
+#            name: page_size
+#            description: The number of donors to return per page
+#            example: 10
+#            required: false
+#            schema:
+#                $ref: '#/components/schemas/Fields'
+#        pageParam:
+#            in: query
+#            name: page
+#            description: The page number to grab
+#            example: 1
+#            required: false
+#            schema:
+#                $ref: '#/components/schemas/Fields'
+#        sessionIDParam:
+#            in: query
+#            name: session_id
+#            description: The cached session ID, to re-use a previous query
+#            example: 088ab991-8802-4a18-9041-108b7144a1d9
+#            required: false
+#            schema:
+#                $ref: '#/components/schemas/Fields'
     schemas:
         Fields:
             type: array
@@ -119,6 +140,22 @@ components:
             items:
                 type: string
             example: [Bone marrow transplant, Chemotherapy]
+        QueryBody:
+            type: object
+            description: Query response
+            properties:
+                summary:
+                    type: object
+                    description: Summary statistics
+                results:
+                    type: array
+                    description: Donors matching the query
+                next:
+                    type: string
+                    description: URL to grab the next set of results
+                prev:
+                    type: string
+                    description: URL to grab the previous set of results
         # ERROR SCHEMAS
         Error:
             type: object
