@@ -1,7 +1,9 @@
 from flask import request, Flask, session
+import json
 import requests
 import secrets
 import urllib
+
 import config
 
 PAGE_SIZE = 10000000
@@ -136,6 +138,10 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
             )
             donors = [donor for donor in donors if donor['submitter_donor_id'] in permissible_donors]
     summary_stats = get_summary_stats(donors, request.headers)
+
+    # Now we combine this with HTSGet, if any
+    if chrom or gene:
+        
     
     # TODO: Cache the above list of donor IDs and summary statistics
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
@@ -146,9 +152,13 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
         headers=request.headers)
     full_data = r.json()
+    full_data['count'] = len(donors)
     full_data['summary'] = summary_stats
+    full_data['next'] = None
+    full_data['prev'] = None
 
     # Add prev and next parameters to the repsonse, appending a session ID.
     # Essentially we want to go session ID -> list of donors
     # and then paginate the list of donors, calling donors_with_clinical_data on each before returning
-    return str(full_data), 200
+    print(json.dumps(full_data))
+    return full_data, 200
