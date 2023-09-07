@@ -107,6 +107,43 @@ def get_summary_stats(donors, headers):
         'patients_per_cohort': patients_per_cohort
     }
 
+def query_htsget_gene(gene):
+    payload = {
+        'query': {
+            'requestParameters': {
+                'gene_id': gene
+            }
+        },
+        'meta': {
+            'apiVersion': 'v2'
+        }
+    }
+
+    return requests.post(
+        f"{config.HTSGET_URL}/beacon/v2/g_variants/",
+        headers=request.headers,
+        json=payload).json()
+
+def query_htsget_pos(assembly, chrom, start=0, end=10000000):
+    payload = {
+        'query': {
+            'requestParameters': {
+                'assemblyId': assembly,
+                'referenceName': chrom,
+                'start': start,
+                'end': end
+            }
+        },
+        'meta': {
+            'apiVersion': 'v2'
+        }
+    }
+
+    return requests.post(
+        f"{config.HTSGET_URL}/beacon/v2/g_variants/",
+        headers=request.headers,
+        json=payload).json()
+
 @app.route('/query')
 def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, session_id=""):
     # NB: We're still doing table joins here, which is probably not where we want to do them
@@ -140,8 +177,13 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     summary_stats = get_summary_stats(donors, request.headers)
 
     # Now we combine this with HTSGet, if any
-    if chrom or gene:
-        
+    if gene or chrom:
+        if gene:
+            htsget = query_htsget_gene(gene)
+        else:
+            search = re.search('(chr[XY0-9]{2}):(\d+)-(\d+)', 'chrom')
+            htsget = query_htsget_pos('hg37', search.group(0), search.group(1), search.group(2))
+        results = htsget['results']['beaconHandovers']
     
     # TODO: Cache the above list of donor IDs and summary statistics
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
