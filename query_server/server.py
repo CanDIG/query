@@ -1,4 +1,3 @@
-from flask import Flask, session
 from flask_cors import CORS
 import connexion
 import secrets

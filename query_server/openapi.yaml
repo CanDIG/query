@@ -35,6 +35,9 @@ paths:
                 - $ref: "#/components/parameters/hormoneTherapyParam"
                 - $ref: "#/components/parameters/chrParam"
                 - $ref: "#/components/parameters/geneParam"
+                - $ref: "#/components/parameters/assemblyParam"
+                - $ref: "#/components/parameters/pageSizeParam"
+                - $ref: "#/components/parameters/pageNumParam"
             operationId: query_operations.query
             responses:
                 200:
@@ -97,11 +100,9 @@ components:
             description: |
                 A chromosome to search for variants within. This cannot be used with a geneParam, and must be of the format
                 chr#:start-end
-            example: chrX:1000-2000
-            pattern: '^chr[XY0-9]{2}:\d+-\d+$'
             required: false
             schema:
-                $ref: '#/components/schemas/Fields'
+                $ref: '#/components/schemas/Field'
         geneParam:
             in: query
             name: gene
@@ -110,22 +111,29 @@ components:
             required: false
             schema:
                 $ref: '#/components/schemas/Fields'
-#        pageSizeParam:
-#            in: query
-#            name: page_size
-#            description: The number of donors to return per page
-#            example: 10
-#            required: false
-#            schema:
-#                $ref: '#/components/schemas/Fields'
-#        pageParam:
-#            in: query
-#            name: page
-#            description: The page number to grab
-#            example: 1
-#            required: false
-#            schema:
-#                $ref: '#/components/schemas/Fields'
+        assemblyParam:
+            in: query
+            name: assembly
+            description: A genomic assembly to search for variants within.
+            example: hg38
+            schema:
+                $ref: '#/components/schemas/Field'
+        pageSizeParam:
+            in: query
+            name: page_size
+            description: The number of donors to return per page
+            example: 10
+            required: false
+            schema:
+                $ref: '#/components/schemas/Field'
+        pageParam:
+            in: query
+            name: page
+            description: The page number to grab
+            example: 1
+            required: false
+            schema:
+                $ref: '#/components/schemas/Field'
 #        sessionIDParam:
 #            in: query
 #            name: session_id
@@ -137,10 +145,13 @@ components:
     schemas:
         Fields:
             type: array
-            description: Acceptable requested fields for genomic alignment files
+            description: Acceptable requested fields for querying
             items:
                 type: string
             example: [Bone marrow transplant, Chemotherapy]
+        Field:
+            type: string
+            description: Acceptable requested string for querying
         QueryBody:
             type: object
             description: Query response

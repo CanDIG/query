@@ -1,5 +1,6 @@
 from flask import request, Flask, session
 import json
+import re
 import requests
 import secrets
 import urllib
@@ -28,6 +29,11 @@ def get_service_info():
         "version": "0.1.0"
     }
 
+def safe_get_request_json(request, name):
+    if not request.ok:
+        raise Exception(f"Could not get {name} response: {request.status_code} {request.text}")
+    return request.json()
+
 # Grab a list of donors matching a given filter from the given URL
 def get_donors_from_katsu(url, param_name, parameter_list):
     permissible_donors = set()
@@ -38,8 +44,9 @@ def get_donors_from_katsu(url, param_name, parameter_list):
             'page_size': PAGE_SIZE
         }
         treatments = requests.get(f"{url}?{urllib.parse.urlencode(parameters)}", headers=request.headers)
-        results = treatments.json()['results']
+        results = safe_get_request_json(treatments, f'Katsu {param_name}')['results']
         permissible_donors |= set([result['submitter_donor_id'] for result in results])
+    print(permissible_donors)
     return permissible_donors
 
 def add_or_increment(dict, key):
@@ -51,7 +58,8 @@ def add_or_increment(dict, key):
 def get_summary_stats(donors, headers):
     # Perform (and cache) summary statistics
     diagnoses = requests.get(f"{config.KATSU_URL}/v2/authorized/primary_diagnoses/?page_size={PAGE_SIZE}",
-        headers=headers).json()['results']
+        headers=headers)
+    diagnoses = safe_get_request_json(diagnoses, 'Katsu diagnoses')['results']
     # This search is inefficient O(m*n)
     # Should find a better way (Preferably SQL again)
     donor_ids = [donor['submitter_donor_id'] for donor in donors]
@@ -77,7 +85,8 @@ def get_summary_stats(donors, headers):
     # Treatment types
     # http://candig.docker.internal:8008/v2/authorized/treatments/
     treatments = requests.get(f"{config.KATSU_URL}/v2/authorized/treatments/?page_size={PAGE_SIZE}",
-        headers=headers).json()['results']
+        headers=headers)
+    treatments = safe_get_request_json(treatments, 'Katsu treatments')['results']
     treatment_type_count = {}
     for treatment in treatments:
         # This search is inefficient O(m*n)
@@ -107,7 +116,7 @@ def get_summary_stats(donors, headers):
         'patients_per_cohort': patients_per_cohort
     }
 
-def query_htsget_gene(gene):
+def query_htsget_gene(headers, gene):
     payload = {
         'query': {
             'requestParameters': {
@@ -119,19 +128,19 @@ def query_htsget_gene(gene):
         }
     }
 
-    return requests.post(
-        f"{config.HTSGET_URL}/beacon/v2/g_variants/",
-        headers=request.headers,
-        json=payload).json()
+    return safe_get_request_json(requests.post(
+        f"{config.HTSGET_URL}/beacon/v2/g_variants",
+        headers=headers,
+        json=payload), 'HTSGet Gene')
 
-def query_htsget_pos(assembly, chrom, start=0, end=10000000):
+def query_htsget_pos(headers, assembly, chrom, start=0, end=10000000):
     payload = {
         'query': {
             'requestParameters': {
                 'assemblyId': assembly,
                 'referenceName': chrom,
-                'start': start,
-                'end': end
+                'start': [start],
+                'end': [end]
             }
         },
         'meta': {
@@ -139,13 +148,13 @@ def query_htsget_pos(assembly, chrom, start=0, end=10000000):
         }
     }
 
-    return requests.post(
-        f"{config.HTSGET_URL}/beacon/v2/g_variants/",
-        headers=request.headers,
-        json=payload).json()
+    return safe_get_request_json(requests.post(
+        f"{config.HTSGET_URL}/beacon/v2/g_variants",
+        headers=headers,
+        json=payload), 'HTSGet position')
 
 @app.route('/query')
-def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, session_id=""):
+def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, assembly="hg38", session_id=""):
     # NB: We're still doing table joins here, which is probably not where we want to do them
     # We're grabbing (and storing in memory) all the donor data in Katsu with the below request
 
@@ -154,10 +163,10 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     url = f"{config.KATSU_URL}/v2/authorized/donors/"
     if primary_site != "":
         params['primary_site'] = ",".join(primary_site)
-    r = requests.get(f"{url}?{urllib.parse.urlencode(params)}",
+    r = safe_get_request_json(requests.get(f"{url}?{urllib.parse.urlencode(params)}",
         # Reuse their bearer token
-        headers=request.headers)
-    donors = r.json()['results']
+        headers=request.headers), 'Katsu Donors')
+    donors = r['results']
 
     # Will need to look into how to go about this -- ideally we implement this into the SQL in Katsu's side
     filters = [
@@ -174,26 +183,70 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
                 this_filter
             )
             donors = [donor for donor in donors if donor['submitter_donor_id'] in permissible_donors]
-    summary_stats = get_summary_stats(donors, request.headers)
 
     # Now we combine this with HTSGet, if any
-    if gene or chrom:
-        if gene:
-            htsget = query_htsget_gene(gene)
-        else:
-            search = re.search('(chr[XY0-9]{2}):(\d+)-(\d+)', 'chrom')
-            htsget = query_htsget_pos('hg37', search.group(0), search.group(1), search.group(2))
-        results = htsget['results']['beaconHandovers']
-    
+    genomic_query = []
+    if gene != "" or chrom != "":
+        try:
+            if gene != "":
+                htsget = query_htsget_gene(request.headers, gene)
+            else:
+                search = re.search('(chr[XY0-9]{2}):(\d+)-(\d+)', chrom)
+                htsget = query_htsget_pos(request.headers, assembly, search.group(1), int(search.group(2)), int(search.group(3)))
+
+            # We need to be able to map specimens, so we'll grab it from Katsu
+            specimen_query_req = requests.get(f"{config.KATSU_URL}/v2/authorized/sample_registrations/?page_size=10000000", headers=request.headers)
+            specimen_query = safe_get_request_json(specimen_query_req, 'Katsu sample registrations')
+            specimen_mapping = {}
+            for specimen in specimen_query['results']:
+                specimen_mapping[specimen['submitter_sample_id']] = (specimen['submitter_donor_id'], specimen['tumour_normal_designation'])
+
+            # handovers = htsget['results']['beaconHandovers']
+            htsget_found_donors = {}
+            for response in htsget['response']:
+                genomic_query = response['caseLevelData']
+                for case_data in response['caseLevelData']:
+                    id = case_data['biosampleId'].split('~')
+                    if len(id) > 1:
+                        case_data['program_id'] = id[0]
+                        submitter_specimen_id = id[1]
+                        case_data['submitter_specimen_id'] = submitter_specimen_id
+                        if submitter_specimen_id in specimen_mapping:
+                            case_data['donor_id'] = specimen_mapping[submitter_specimen_id][0]
+                            case_data['tumour_normal_designation'] = specimen_mapping[submitter_specimen_id][1]
+                        else:
+                            print(f"Could not find donor mapping for {case_data}")
+                            case_data['donor_id'] = submitter_specimen_id
+                            case_data['tumour_normal_designation'] = 'Tumour'
+                        htsget_found_donors[case_data['donor_id']] = 1
+                    else:
+                        print(f"Could not parse biosampleId for {case_data}")
+                        case_data['program_id'] = ""
+                        case_data['donor_id'] = ""
+                        case_data['submitter_specimen_id'] = case_data['biosampleId']
+                        case_data['tumour_normal_designation'] = 'Tumour'
+                    case_data['position'] = response['variation']['location']['interval']['start']['value']
+            # Filter clinical results based on genomic results
+            donors = [donor for donor in donors if donor['submitter_donor_id'] in htsget_found_donors]
+        except Exception as ex:
+            print(ex)
+
     # TODO: Cache the above list of donor IDs and summary statistics
+    summary_stats = get_summary_stats(donors, request.headers)
+
+    # Determine which part of the filtered donors to send back
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
-    params = {
-        'page_size': PAGE_SIZE,
-        'donors': ','.join(ret_donors)
-    }
-    r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
-        headers=request.headers)
-    full_data = r.json()
+    if len(donors) > 0:
+        params = {
+            'page_size': PAGE_SIZE,
+            'donors': ','.join(ret_donors)
+        }
+        r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
+            headers=request.headers)
+        full_data = safe_get_request_json(r, 'Katsu donor clinical data')
+    else:
+        full_data = {'results': []}
+    full_data['genomic'] = genomic_query
     full_data['count'] = len(donors)
     full_data['summary'] = summary_stats
     full_data['next'] = None
@@ -202,5 +255,4 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     # Add prev and next parameters to the repsonse, appending a session ID.
     # Essentially we want to go session ID -> list of donors
     # and then paginate the list of donors, calling donors_with_clinical_data on each before returning
-    print(json.dumps(full_data))
     return full_data, 200
