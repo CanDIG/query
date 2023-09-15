@@ -37,7 +37,7 @@ paths:
                 - $ref: "#/components/parameters/geneParam"
                 - $ref: "#/components/parameters/assemblyParam"
                 - $ref: "#/components/parameters/pageSizeParam"
-                - $ref: "#/components/parameters/pageNumParam"
+                - $ref: "#/components/parameters/pageParam"
             operationId: query_operations.query
             responses:
                 200:
