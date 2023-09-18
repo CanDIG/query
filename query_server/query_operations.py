@@ -68,6 +68,12 @@ def get_summary_stats(donors, headers):
     for diagnosis in diagnoses:
         if diagnosis['submitter_donor_id'] in donor_ids:
             donor_idx = donor_ids.index(diagnosis['submitter_donor_id'])
+
+            # Make sure we have both dates necessary for this analysis
+            if 'date_of_diagnosis' not in diagnosis or donor_idx not in donor_date_of_births:
+                print(f"Unable to find diagnosis date for {diagnosis['submitter_donor_id']}")
+                continue
+
             diag_date = diagnosis['date_of_diagnosis'].split('-')
             birth_date = donor_date_of_births[donor_idx].split('-')
 
