@@ -206,6 +206,9 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
             for response in htsget['response']:
                 genomic_query = response['caseLevelData']
                 for case_data in response['caseLevelData']:
+                    if 'biosampleId' not in case_data:
+                        print(f"Could not parse htsget response for {case_data}")
+                        continue
                     id = case_data['biosampleId'].split('~')
                     if len(id) > 1:
                         case_data['program_id'] = id[0]
