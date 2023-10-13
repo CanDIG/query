@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+    title: Query
+    version: 1.2.0
+servers:
+    - url: /
+security:
+    - {}
+    - BasicAuth: []
+    - BearerAuth: []
+paths:
+    /service-info:
+        get:
+            summary: Retrieve information about this service
+            description: Returns information about the query service
+            operationId: query_operations.get_service_info
+            responses:
+                200:
+                    description: Retrieve info about the Query service
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+    /query:
+        get:
+            summary: Retrieve patients matching the filters
+            description: |
+                Gets a query ticket containing streamed information about patients
+                that match the given query
+            parameters:
+                - $ref: "#/components/parameters/treatmentParam"
+                - $ref: "#/components/parameters/primarySiteParam"
+                - $ref: "#/components/parameters/chemotherapyParam"
+                - $ref: "#/components/parameters/immunotherapyParam"
+                - $ref: "#/components/parameters/hormoneTherapyParam"
+                - $ref: "#/components/parameters/chrParam"
+                - $ref: "#/components/parameters/geneParam"
+                - $ref: "#/components/parameters/assemblyParam"
+                - $ref: "#/components/parameters/pageSizeParam"
+                - $ref: "#/components/parameters/pageParam"
+                - $ref: "#/components/parameters/excludeCohortsParam"
+            operationId: query_operations.query
+            responses:
+                200:
+                    description: Retrieve info about the Query service
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/QueryBody'
+                400:
+                    $ref: "#/components/responses/400BadRequestError"
+                404:
+                    $ref: "#/components/responses/404NotFoundError"
+                5XX:
+                    $ref: "#/components/responses/5xxServerError"
+components:
+    parameters:
+        treatmentParam:
+            in: query
+            name: treatment
+            description: A comma-separated list of treatments to look for
+            example: Bone marrow transplant,Chemotherapy
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        primarySiteParam:
+            in: query
+            name: primary_site
+            description: A comma-separated list of affected primary sites to look for
+            example: Adrenal gland,Bladder
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        chemotherapyParam:
+            in: query
+            name: chemotherapy
+            description: A comma-separated list of chemotherapy treatments to look for
+            example: FLUOROURACIL,LEUCOVORIN
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        immunotherapyParam:
+            in: query
+            name: immunotherapy
+            description: A comma-separated list of immunotherapy treatments to look for
+            example: Necitumumab,Pembrolizumab
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        hormoneTherapyParam:
+            in: query
+            name: hormone_therapy
+            description: A comma-separated list of hormone therapy treatments to look for
+            example: Goserelin,Leuprolide
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        chrParam:
+            in: query
+            name: chrom
+            description: |
+                A chromosome to search for variants within. This cannot be used with a geneParam, and must be of the format
+                chr#:start-end
+            required: false
+            schema:
+                $ref: '#/components/schemas/Field'
+        geneParam:
+            in: query
+            name: gene
+            description: A gene name to search for variants within. This cannot be used with chrParam
+            example: ZYG11A
+            required: false
+            schema:
+                $ref: '#/components/schemas/Fields'
+        assemblyParam:
+            in: query
+            name: assembly
+            description: A genomic assembly to search for variants within.
+            example: hg38
+            schema:
+                $ref: '#/components/schemas/Field'
+        excludeCohortsParam:
+            in: query
+            name: exclude_cohorts
+            description: A list of cohorts that will be excluded from results
+            example: SYNTHETIC-1
+            schema:
+                $ref: '#/components/schemas/Fields'
+        pageSizeParam:
+            in: query
+            name: page_size
+            description: The number of donors to return per page
+            example: 10
+            required: false
+            schema:
+                $ref: '#/components/schemas/Field'
+        pageParam:
+            in: query
+            name: page
+            description: The page number to grab
+            example: 1
+            required: false
+            schema:
+                $ref: '#/components/schemas/Field'
+#        sessionIDParam:
+#            in: query
+#            name: session_id
+#            description: The cached session ID, to re-use a previous query
+#            example: 088ab991-8802-4a18-9041-108b7144a1d9
+#            required: false
+#            schema:
+#                $ref: '#/components/schemas/Fields'
+    schemas:
+        Fields:
+            type: array
+            description: Acceptable requested fields for querying
+            items:
+                type: string
+            example: [Bone marrow transplant, Chemotherapy]
+        Field:
+            type: string
+            description: Acceptable requested string for querying
+        QueryBody:
+            type: object
+            description: Query response
+            properties:
+                summary:
+                    type: object
+                    description: Summary statistics
+                results:
+                    type: array
+                    description: Donors matching the query
+                next:
+                    type: string
+                    description: URL to grab the next set of results
+                prev:
+                    type: string
+                    description: URL to grab the previous set of results
+        # ERROR SCHEMAS
+        Error:
+            type: object
+            properties:
+                query:
+                    type: object
+                    description: Error object container
+                    properties:
+                        error:
+                            type: string
+                            description: Name/type of the error that occurred
+                            example: ServerError
+                        message:
+                            type: string
+                            description: Message explaining why the error occurred
+                            example: An unspecified server error occurred
+                    required:
+                        - error
+                        - message
+            required:
+                - query
+        BadRequestError:
+            allOf:
+                - $ref: "#/components/schemas/Error"
+                - properties:
+                    query:
+                        properties:
+                            error:
+                                example: InvalidInput
+                            message:
+                                example: "FOO is not an acceptable field"
+        NotFoundError:
+            allOf:
+                - $ref: "#/components/schemas/Error"
+                - properties:
+                    query:
+                        properties:
+                            error:
+                                example: NotFound
+                            message:
+                                example: The requested resource could not be located
+        # RESPONSE SCHEMAS
+    responses:
+        400BadRequestError:
+            description: The request was not processed, as the request parameters did not adhere to the specification
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/BadRequestError'
+        404NotFoundError:
+            description: The request was not processed, as the requested object was not found
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/NotFoundError'
+        5xxServerError:
+            description: Unspecified server error encountered
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/Error'
+    securitySchemes:
+        BasicAuth:
+            type: http
+            scheme: basic
+            description: |
+                A valid authorization token must be passed in the 'Authorization' header,
+                e.g. "Basic ${token_string}"
+        BearerAuth:
+            type: http
+            scheme: bearer
+            description:
+                A valid authorization token must be passed in the 'Authorization' header,
+                e.g. "Bearer ${token_string}"
