@@ -38,6 +38,7 @@ paths:
                 - $ref: "#/components/parameters/assemblyParam"
                 - $ref: "#/components/parameters/pageSizeParam"
                 - $ref: "#/components/parameters/pageParam"
+                - $ref: "#/components/parameters/excludeCohortsParam"
             operationId: query_operations.query
             responses:
                 200:
@@ -118,6 +119,13 @@ components:
             example: hg38
             schema:
                 $ref: '#/components/schemas/Field'
+        excludeCohortsParam:
+            in: query
+            name: exclude_cohorts
+            description: A list of cohorts that will be excluded from results
+            example: SYNTHETIC-1
+            schema:
+                $ref: '#/components/schemas/Fields'
         pageSizeParam:
             in: query
             name: page_size

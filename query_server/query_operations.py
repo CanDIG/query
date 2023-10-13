@@ -160,7 +160,7 @@ def query_htsget_pos(headers, assembly, chrom, start=0, end=10000000):
         json=payload), 'HTSGet position')
 
 @app.route('/query')
-def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, assembly="hg38", session_id=""):
+def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, assembly="hg38", exclude_cohorts=[], session_id=""):
     # NB: We're still doing table joins here, which is probably not where we want to do them
     # We're grabbing (and storing in memory) all the donor data in Katsu with the below request
 
@@ -173,6 +173,11 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
         # Reuse their bearer token
         headers=request.headers), 'Katsu Donors')
     donors = r['results']
+
+    # Filter on excluded cohorts
+    print(str(donors))
+    print(str(exclude_cohorts))
+    donors = [donor for donor in donors if donor['program_id'] not in exclude_cohorts]
 
     # Will need to look into how to go about this -- ideally we implement this into the SQL in Katsu's side
     filters = [
