@@ -42,7 +42,7 @@ paths:
             operationId: query_operations.query
             responses:
                 200:
-                    description: Retrieve info about the Query service
+                    description: Retrieved donor information
                     content:
                         application/json:
                             schema:
@@ -53,6 +53,21 @@ paths:
                     $ref: "#/components/responses/404NotFoundError"
                 5XX:
                     $ref: "#/components/responses/5xxServerError"
+    /genomic-completeness:
+        get:
+            summary: Retrieve summary statistics on genomic data
+            description: Retrieve summary statistics on genomic data
+            operationId: query_operations.genomic_completeness
+            responses:
+                200:
+                    description: Retrieved genomic completness information
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GenomicCompletenessBody'
+                5XX:
+                    $ref: "#/components/responses/5xxServerError"
+                    
 components:
     parameters:
         treatmentParam:
@@ -176,6 +191,13 @@ components:
                 prev:
                     type: string
                     description: URL to grab the previous set of results
+        GenomicCompletenessBody:
+            type: object
+            description: Genomic completeness statistics
+            properties:
+                results:
+                    type: object
+                    description: Summary statistics of program id (key) to number of complete cases (value)
         # ERROR SCHEMAS
         Error:
             type: object

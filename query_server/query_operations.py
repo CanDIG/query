@@ -270,3 +270,30 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     # Essentially we want to go session ID -> list of donors
     # and then paginate the list of donors, calling donors_with_clinical_data on each before returning
     return full_data, 200
+
+@app.route('/genomic_completeness')
+def genomic_completeness():
+    params = { 'page_size': PAGE_SIZE }
+    url = f"{config.KATSU_URL}/v2/authorized/sample_registrations/"
+    r = safe_get_request_json(requests.get(f"{url}?{urllib.parse.urlencode(params)}",
+        # Reuse their bearer token
+        headers=request.headers), 'Katsu sample registrations')
+    samples = r['results']
+
+    retVal = {}
+    for sample in samples:
+        program_id = sample['program_id']
+        if program_id not in retVal:
+            retVal[program_id] = 0
+        sample_id = sample['submitter_sample_id']
+
+        # Check with HTSGet to see whether or not this sample is complete
+        r = requests.get(f"{config.HTSGET_URL}/htsget/v1/samples/{sample_id}",
+            # Reuse their bearer token
+            headers=request.headers)
+        if r.ok:
+            r_json = r.json()
+            if len(r_json['genomes']) > 0 and len(r_json['transcriptomes']) > 0:
+                retVal[program_id] += 1
+
+    return retVal, 200
