@@ -53,7 +53,7 @@ paths:
                     $ref: "#/components/responses/404NotFoundError"
                 5XX:
                     $ref: "#/components/responses/5xxServerError"
-    /genomic-completeness:
+    /genomic_completeness:
         get:
             summary: Retrieve summary statistics on genomic data
             description: Retrieve summary statistics on genomic data
@@ -197,7 +197,7 @@ components:
             properties:
                 results:
                     type: object
-                    description: Summary statistics of program id (key) to number of complete cases (value)
+                    description: Summary statistics of program id (key) to another object with number of complete genomic and transcriptome cases
         # ERROR SCHEMAS
         Error:
             type: object

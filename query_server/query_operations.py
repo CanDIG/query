@@ -284,7 +284,7 @@ def genomic_completeness():
     for sample in samples:
         program_id = sample['program_id']
         if program_id not in retVal:
-            retVal[program_id] = 0
+            retVal[program_id] = { 'genomes': 0, 'transcriptomes': 0, 'all': 0 }
         sample_id = sample['submitter_sample_id']
 
         # Check with HTSGet to see whether or not this sample is complete
@@ -293,7 +293,12 @@ def genomic_completeness():
             headers=request.headers)
         if r.ok:
             r_json = r.json()
+            retVal[program_id]
             if len(r_json['genomes']) > 0 and len(r_json['transcriptomes']) > 0:
-                retVal[program_id] += 1
+                retVal[program_id]['all'] += 1
+            if len(r_json['genomes']) > 0:
+                retVal[program_id]['genomes'] += 1
+            if len(r_json['transcriptomes']) > 0:
+                retVal[program_id]['transcriptomes'] += 1
 
     return retVal, 200
