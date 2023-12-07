@@ -167,6 +167,24 @@ def query_htsget_pos(headers, assembly, chrom, start=0, end=10000000):
         headers=headers,
         json=payload), 'HTSGet position')
 
+# The return value does not like None being used as a key, so this helper function recursively
+# goes through the dictionary provided, and changes all keys to strings
+# NB: This overwrites any keys that were previously not strings, and can cause data deletion
+# if there was two keys e.g. 12 and "12"
+def fix_dicts(to_fix):
+    if isinstance(to_fix, dict):
+        new_dict = {}
+        for key, value in to_fix.items():
+            new_dict[str(key)] = fix_dicts(value)
+        return new_dict
+    elif isinstance(to_fix, list):
+        new_list = []
+        for value in to_fix:
+            new_list.append(fix_dicts(value))
+        return new_list
+    else:
+        return to_fix
+
 @app.route('/query')
 def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, assembly="hg38", exclude_cohorts=[], session_id=""):
     # NB: We're still doing table joins here, which is probably not where we want to do them
@@ -260,7 +278,7 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
     if len(donors) > 0:
         params = {
-            'page_size': PAGE_SIZE,
+            'page_size': page_size,
             'donors': ','.join(ret_donors)
         }
         r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
@@ -277,4 +295,4 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     # Add prev and next parameters to the repsonse, appending a session ID.
     # Essentially we want to go session ID -> list of donors
     # and then paginate the list of donors, calling donors_with_clinical_data on each before returning
-    return full_data, 200
+    return fix_dicts(full_data), 200
