@@ -69,15 +69,21 @@ def get_summary_stats(donors, headers):
     for diagnosis in diagnoses:
         if diagnosis['submitter_donor_id'] in donor_date_of_births:
             # Make sure we have both dates necessary for this analysis
-            if 'date_of_diagnosis' not in diagnosis:
+            if 'date_of_diagnosis' not in diagnosis or diagnosis['date_of_diagnosis'] is None:
                 print(f"Unable to find diagnosis date for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
                 continue
-            if diagnosis['submitter_donor_id'] not in donor_date_of_births:
+            if diagnosis['submitter_donor_id'] not in donor_date_of_births or donor_date_of_births[diagnosis['submitter_donor_id']] is None:
                 print(f"Unable to find date of birth for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
                 continue
 
             diag_date = diagnosis['date_of_diagnosis'].split('-')
             birth_date = donor_date_of_births[diagnosis['submitter_donor_id']].split('-')
+            if len(diag_date) < 2 or len(birth_date) < 2:
+                print(f"Unable to find date of birth/diagnosis for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
+                continue
 
             age = int(diag_date[0]) - int(birth_date[0])
             if int(diag_date[1]) >= int(birth_date[1]):
