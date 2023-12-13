@@ -44,9 +44,8 @@ def get_donors_from_katsu(url, param_name, parameter_list):
             'page_size': PAGE_SIZE
         }
         treatments = requests.get(f"{url}?{urllib.parse.urlencode(parameters)}", headers=request.headers)
-        results = safe_get_request_json(treatments, f'Katsu {param_name}')['results']
+        results = safe_get_request_json(treatments, f'Katsu {param_name}')['items']
         permissible_donors |= set([result['submitter_donor_id'] for result in results])
-    print(permissible_donors)
     return permissible_donors
 
 def add_or_increment(dict, key):
@@ -59,7 +58,7 @@ def get_summary_stats(donors, headers):
     # Perform (and cache) summary statistics
     diagnoses = requests.get(f"{config.KATSU_URL}/v2/authorized/primary_diagnoses/?page_size={PAGE_SIZE}",
         headers=headers)
-    diagnoses = safe_get_request_json(diagnoses, 'Katsu diagnoses')['results']
+    diagnoses = safe_get_request_json(diagnoses, 'Katsu diagnoses')['items']
     # This search is inefficient O(m*n)
     # Should find a better way (Preferably SQL again)
     donor_date_of_births = {}
@@ -100,7 +99,7 @@ def get_summary_stats(donors, headers):
     # http://candig.docker.internal:8008/v2/authorized/treatments/
     treatments = requests.get(f"{config.KATSU_URL}/v2/authorized/treatments/?page_size={PAGE_SIZE}",
         headers=headers)
-    treatments = safe_get_request_json(treatments, 'Katsu treatments')['results']
+    treatments = safe_get_request_json(treatments, 'Katsu treatments')['items']
     treatment_type_count = {}
     for treatment in treatments:
         # This search is inefficient O(m*n)
@@ -198,11 +197,9 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     r = safe_get_request_json(requests.get(f"{url}?{urllib.parse.urlencode(params)}",
         # Reuse their bearer token
         headers=request.headers), 'Katsu Donors')
-    donors = r['results']
+    donors = r['items']
 
     # Filter on excluded cohorts
-    print(str(donors))
-    print(str(exclude_cohorts))
     donors = [donor for donor in donors if donor['program_id'] not in exclude_cohorts]
 
     # Will need to look into how to go about this -- ideally we implement this into the SQL in Katsu's side
@@ -276,14 +273,16 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
 
     # Determine which part of the filtered donors to send back
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
+    ret_programs = [donor['program_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
+    full_data = {'results' : []}
     if len(donors) > 0:
-        params = {
-            'page_size': page_size,
-            'donors': ','.join(ret_donors)
-        }
-        r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
-            headers=request.headers)
-        full_data = safe_get_request_json(r, 'Katsu donor clinical data')
+        for i, donor_id in enumerate(ret_donors):
+            donor_id_url = urllib.parse.quote(donor_id)
+            program_id_url = urllib.parse.quote(ret_programs[i])
+            print('asdf')
+            r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/program/{program_id_url}/donor/{donor_id_url}",
+                headers=request.headers)
+            full_data['results'].append(safe_get_request_json(r, 'Katsu donor clinical data'))
     else:
         full_data = {'results': []}
     full_data['genomic'] = genomic_query
