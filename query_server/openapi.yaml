@@ -133,7 +133,7 @@ components:
             example: 10
             required: false
             schema:
-                $ref: '#/components/schemas/Field'
+                $ref: '#/components/schemas/IntField'
         pageParam:
             in: query
             name: page
@@ -141,7 +141,7 @@ components:
             example: 1
             required: false
             schema:
-                $ref: '#/components/schemas/Field'
+                $ref: '#/components/schemas/IntField'
 #        sessionIDParam:
 #            in: query
 #            name: session_id
@@ -160,6 +160,9 @@ components:
         Field:
             type: string
             description: Acceptable requested string for querying
+        IntField:
+            type: integer
+            description: Acceptable integer for querying
         QueryBody:
             type: object
             description: Query response
