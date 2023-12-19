@@ -69,15 +69,21 @@ def get_summary_stats(donors, headers):
     for diagnosis in diagnoses:
         if diagnosis['submitter_donor_id'] in donor_date_of_births:
             # Make sure we have both dates necessary for this analysis
-            if 'date_of_diagnosis' not in diagnosis:
+            if 'date_of_diagnosis' not in diagnosis or diagnosis['date_of_diagnosis'] is None:
                 print(f"Unable to find diagnosis date for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
                 continue
-            if diagnosis['submitter_donor_id'] not in donor_date_of_births:
+            if diagnosis['submitter_donor_id'] not in donor_date_of_births or donor_date_of_births[diagnosis['submitter_donor_id']] is None:
                 print(f"Unable to find date of birth for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
                 continue
 
             diag_date = diagnosis['date_of_diagnosis'].split('-')
             birth_date = donor_date_of_births[diagnosis['submitter_donor_id']].split('-')
+            if len(diag_date) < 2 or len(birth_date) < 2:
+                print(f"Unable to find date of birth/diagnosis for {diagnosis['submitter_donor_id']}")
+                add_or_increment(age_at_diagnosis, 'Unknown')
+                continue
 
             age = int(diag_date[0]) - int(birth_date[0])
             if int(diag_date[1]) >= int(birth_date[1]):
@@ -116,7 +122,7 @@ def get_summary_stats(donors, headers):
             patients_per_cohort[program_id] += 1
         else:
             patients_per_cohort[program_id] = 1
-    
+
     return {
         'age_at_diagnosis': age_at_diagnosis,
         'treatment_type_count': treatment_type_count,
@@ -160,6 +166,24 @@ def query_htsget_pos(headers, assembly, chrom, start=0, end=10000000):
         f"{config.HTSGET_URL}/beacon/v2/g_variants",
         headers=headers,
         json=payload), 'HTSGet position')
+
+# The return value does not like None being used as a key, so this helper function recursively
+# goes through the dictionary provided, and changes all keys to strings
+# NB: This overwrites any keys that were previously not strings, and can cause data deletion
+# if there was two keys e.g. 12 and "12"
+def fix_dicts(to_fix):
+    if isinstance(to_fix, dict):
+        new_dict = {}
+        for key, value in to_fix.items():
+            new_dict[str(key)] = fix_dicts(value)
+        return new_dict
+    elif isinstance(to_fix, list):
+        new_list = []
+        for value in to_fix:
+            new_list.append(fix_dicts(value))
+        return new_list
+    else:
+        return to_fix
 
 @app.route('/query')
 def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", hormone_therapy="", chrom="", gene="", page=0, page_size=10, assembly="hg38", exclude_cohorts=[], session_id=""):
@@ -254,7 +278,7 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     ret_donors = [donor['submitter_donor_id'] for donor in donors[(page*page_size):((page+1)*page_size)]]
     if len(donors) > 0:
         params = {
-            'page_size': PAGE_SIZE,
+            'page_size': page_size,
             'donors': ','.join(ret_donors)
         }
         r = requests.get(f"{config.KATSU_URL}/v2/authorized/donor_with_clinical_data/?{urllib.parse.urlencode(params)}",
@@ -271,7 +295,7 @@ def query(treatment="", primary_site="", chemotherapy="", immunotherapy="", horm
     # Add prev and next parameters to the repsonse, appending a session ID.
     # Essentially we want to go session ID -> list of donors
     # and then paginate the list of donors, calling donors_with_clinical_data on each before returning
-    return full_data, 200
+    return fix_dicts(full_data), 200
 
 @app.route('/genomic_completeness')
 def genomic_completeness():
@@ -304,3 +328,4 @@ def genomic_completeness():
                 retVal[program_id]['transcriptomes'] += 1
 
     return retVal, 200
+
